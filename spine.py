@@ -215,16 +215,16 @@ def inbetween_contour(imagepath, maskpath, rgbimage):
 
 ## contour refinement
 
-#3-2-8  35 is the reference image
+#3-2-8 is the reference image
 def spine_cord_contour(imagepath,maskpath,prefix):
     img = cv2.imread(maskpath)
     img = img[:,:,2]
     img = (img * 100)
-    section1 = img.copy()
-    section2 = img.copy()
+    section1 = img.copy()#mask used for spine
+    section2 = img.copy()#mask used for cord
     #Spine
     section1[section1 == 200] = 0
-    mask1 = cv2.medianBlur(section1,3)
+    mask1 = cv2.medianBlur(section1,5)
     mask1[mask1 != 0] = 1.5
     #cord
     section2[section2 == 100] = 0
@@ -238,7 +238,7 @@ def spine_cord_contour(imagepath,maskpath,prefix):
     orig = cv2.imread(imagepath,0) * 2
     rgbimage = cv2.imread(imagepath)
     feature_img = rgbimage.copy()
-    #normalize all images
+    #normalize all images, reference image is 3-2-8
     norm = 32.99
     print "average:", np.average(orig)
     ave = np.average(orig)
@@ -249,14 +249,17 @@ def spine_cord_contour(imagepath,maskpath,prefix):
     spine = orig * mask1
     cord = orig * mask2 * 100
     
-    ret,th2 = cv2.threshold(spine,35,255,cv2.THRESH_BINARY)#####
+    ret,th2 = cv2.threshold(spine,40,255,cv2.THRESH_BINARY)#####threshhold
     
-    k2 = cv2.getStructuringElement(cv2.MORPH_RECT,(17, 7))
-    th2 = cv2.erode(th2, k2)
-    contours, hierarchy = cv2.findContours(th2,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_NONE)
+    k2 = cv2.getStructuringElement(cv2.MORPH_RECT,(21, 7))
+    th2 = cv2.erode(th2, k2)#erode
+    contours, hierarchy = cv2.findContours(th2,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_NONE)#find contour
     contours = sorted(contours, key = cv2.contourArea, reverse=True)[:8]
-    #cv2.drawContours(rgbimage,contours,-1,(0,0,255),3)
+    cv2.drawContours(rgbimage,contours,-1,(0,0,255),3)
+    #cv2.imshow(prefix,rgbimage)
+    #cv2.waitKey(0)
     #put text and point line
+    '''
     names = ["bone"+str(i) for i in range(8)]
     count = 0
     store_mp = {}
@@ -276,6 +279,7 @@ def spine_cord_contour(imagepath,maskpath,prefix):
         cv2.line(rgbimage, (cX, cY), (cX+50+20*count, cY), (255,255,255), 1)
         cv2.putText(rgbimage, names[count], (cX+50+20*count+ 5, cY), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.CV_AA)
         count += 1
+    index = 1
     for i in range(len(lst)-1):
         y_cur = lst[i]
         x_cur = store_mp[y_cur]
@@ -293,29 +297,35 @@ def spine_cord_contour(imagepath,maskpath,prefix):
 #res = cv2.warpAffine(out,M,(gray_img.shape[1],gray_img.shape[0]))
         cropped = cv2.cvtColor(out, cv2.COLOR_GRAY2BGR) #res
         contour_rect, hierarchy_rect = cv2.findContours(out, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)#res
+        cv2.putText(feature_img, str(index), (point1[0]+20, point1[1]+20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.CV_AA)
+        index += 1
         cv2.drawContours(feature_img,contour_rect,-1,(0,255,0),2)
         (x, y, w, h) = cv2.boundingRect(contour_rect[0])
         cropped = cropped[y:y+h,x:x+w]
 #cv2.imshow('image',cropped)
 #cv2.waitKey(0)
-    #cv2.imwrite("./test_result/" + prefix + str(i)+".png",feature_img)
+#cv2.imwrite("./test_result/" + prefix + str(i)+".png",feature_img)
     ####process cord
     retcord,thcord = cv2.threshold(cord,10,255,cv2.THRESH_BINARY)
     contours_cord, hierarchy_cord = cv2.findContours(thcord,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_NONE)
     cv2.drawContours(rgbimage,contours_cord,-1,(0,255,0),3)
     #cv2.imshow('Image1',rgbimage)
     #cv2.waitKey(0)
-    
-    return rgbimage
+    '''
+    return rgbimage, feature_img
 
 data_path = "./test_images/"
+data_again = "./again/"
+save_path = "./save/"
 label_path = "./Label/"
-image_list = listdir(data_path)
+image_list = listdir(data_again)
 label_list = listdir(label_path)
 for i in range(1,len(image_list)):
     print image_list[i]
     imagepath = data_path+image_list[i]
-    maskpath = label_path+label_list[i-1]
-    img = spine_cord_contour(imagepath,maskpath,image_list[i])
+    maskpath = label_path+image_list[i][:-4]+".png"
+    img, feature_img = spine_cord_contour(imagepath,maskpath,image_list[i])
+    #cv2.imshow('res',feature_img)
+    #cv2.waitKey(0)
     img = inbetween_contour(imagepath,maskpath,img)
-#cv2.imwrite("./"+ str(i)+".png",img)
+#cv2.imwrite(save_path + image_list[i],feature_img)
